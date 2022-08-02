@@ -7,14 +7,14 @@ class Packages:
 
     def __get_installed_packages(self):
         try:
-            with open(self.dir + '/packages') as f:
+            with open(f'{self.dir}/packages') as f:
                 return f.read().split(' ')
         except IOError:
             return []
 
     def __create_environment(self):
         import os.path
-        ready_env = os.path.isfile(self.dir + '/env')
+        ready_env = os.path.isfile(f'{self.dir}/env')
 
         if not ready_env:
             import venv
@@ -22,7 +22,7 @@ class Packages:
             # in `init` function pip will be used with '--upgrade' option to allow using different versions
             venv.create(self.dir, system_site_packages=True)
 
-            open(self.dir + '/env', 'a').close()
+            open(f'{self.dir}/env', 'a').close()
 
     def __clean(self, packages):
         for package in packages:
@@ -38,14 +38,19 @@ class Packages:
                 index = package.find('>')
             elif '<' in package:
                 index = package.find('<')
-            yield package[0: index]
+            yield package[:index]
 
     def list(self):
         import subprocess
         from quix import Quix
         quix = Quix()
 
-        process = subprocess.Popen(self.dir + '/bin/python3 -m pip list --format=freeze', shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen(
+            f'{self.dir}/bin/python3 -m pip list --format=freeze',
+            shell=True,
+            stdout=subprocess.PIPE,
+        )
+
         stdout = process.communicate()[0]
 
         reqs = sorted(stdout.decode('utf-8').strip().split('\n'))
@@ -60,13 +65,15 @@ class Packages:
         self.__create_environment()
 
         if not set(required_packages).issubset(installed_packages):
-            exec (open(self.dir + '/bin/activator.py').read(), {'__file__': self.dir + '/bin/activator.py'})
+            exec(
+                open(f'{self.dir}/bin/activator.py').read(),
+                {'__file__': f'{self.dir}/bin/activator.py'},
+            )
 
-            index_url_args = []
+
             extra_index_url_args = []
 
-            if self.index_url:
-                index_url_args = ['--index-url', self.index_url]
+            index_url_args = ['--index-url', self.index_url] if self.index_url else []
             if self.extra_url:
                 extra_index_url_args = ['--extra-index-url', self.extra_url]
 
@@ -79,12 +86,14 @@ class Packages:
             import sys
             subprocess.check_call([sys.executable, '-m', 'pip'] + pipargs)
 
-            packages_file = open(self.dir + '/packages', 'w+')
-            packages = self.__clean(required_packages)
-            packages_file.write(' '.join(list(packages) + installed_packages))
-            packages_file.close()
+            with open(f'{self.dir}/packages', 'w+') as packages_file:
+                packages = self.__clean(required_packages)
+                packages_file.write(' '.join(list(packages) + installed_packages))
         else:
-            exec (open(self.dir + '/bin/activator.py').read(), {'__file__': self.dir + '/bin/activator.py'})
+            exec(
+                open(f'{self.dir}/bin/activator.py').read(),
+                {'__file__': f'{self.dir}/bin/activator.py'},
+            )
 
     def uninstall(self, *packages):
         self.__create_environment()
@@ -94,13 +103,15 @@ class Packages:
             import subprocess
             import sys
 
-            process = subprocess.Popen(self.dir + '/bin/python3 -m pip uninstall --yes ' + ' '.join(list(packages)),
-                                       shell=True)
+            process = subprocess.Popen(
+                f'{self.dir}/bin/python3 -m pip uninstall --yes '
+                + ' '.join(list(packages)),
+                shell=True,
+            )
+
             process.wait()
 
-            packages_file = open(self.dir + '/packages', 'w+')
-
-            for package in packages:
-                installed_packages.remove(package)
-            packages_file.write(' '.join(installed_packages))
-            packages_file.close()
+            with open(f'{self.dir}/packages', 'w+') as packages_file:
+                for package in packages:
+                    installed_packages.remove(package)
+                packages_file.write(' '.join(installed_packages))
